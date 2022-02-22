@@ -5,7 +5,8 @@
 
 #include <tchar.h>
 
-extern "C" int RDCOM_WriteErrors = 1;
+extern "C" int RDCOM_WriteErrors;
+int RDCOM_WriteErrors = 1;
 
 extern "C"
 SEXP
@@ -23,16 +24,31 @@ RDCOM_getWriteError(SEXP value)
     return(ScalarLogical(RDCOM_WriteErrors));
 }
 
+
+
 FILE *
 getErrorFILE()
 {
   static FILE *f = NULL;
-  if(!f) {
-    f = fopen("C:\\RDCOM.err", "a");
-    if(!f) {
-      f = fopen("C:\\RDCOM_server.err", "a");
+
+  if (f)
+    return f;
+
+  TCHAR path[MAX_PATH];
+  DWORD result;
+
+  result = GetTempPath(MAX_PATH, path);
+
+  if (result > MAX_PATH-10 || result == 0) {
+    f = stderr;
+  } else {
+    lstrcat(path, _T("RDCOM.err"));
+    f = fopen(path, "a");
+    if (!f) {
+      f = stderr;
     }
   }
+
   return(f);
 }
 
@@ -360,8 +376,9 @@ SEXP R_createCOMErrorCodes();
 	#undef MAKE_HRESULT_ENTRY
 
 
-
+#ifndef _countof
 #define _countof(array) (sizeof(array)/sizeof(array[0]))
+#endif
 void GetScodeString(HRESULT hr, LPTSTR buf, int bufSize)
 {
 	// first ask the OS to give it to us..
@@ -385,7 +402,7 @@ void GetScodeString(HRESULT hr, LPTSTR buf, int bufSize)
 		}
 	}
 	// not found - make one up
-	sprintf(buf, ("OLE error 0x%08x"), hr);
+	sprintf(buf, ("OLE error 0x%08lx"), hr);
 }
 
 
@@ -423,7 +440,7 @@ checkErrorInfo(IUnknown *obj, HRESULT status, SEXP *serr)
   HRESULT hr;
   ISupportErrorInfo *info;
 
-  fprintf(stderr, "<checkErrorInfo> %X \n", status);
+  fprintf(stderr, "<checkErrorInfo> %lX \n", status);
 
   if(serr) 
     *serr = NULL;
